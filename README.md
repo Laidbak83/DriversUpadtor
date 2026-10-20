@@ -9,6 +9,7 @@ Outil Windows de détection et de mise à jour des pilotes, dans l'esprit de Sna
    - **Packs SDIO** (Snappy Driver Installer Origin) : base hors ligne. Les `.7z` sont décompressés avec 7-Zip puis tous les `.inf` sont indexés (`cache/sdio-index.json`).
    - **Microsoft Update Catalog** : recherche en ligne par identifiant matériel, téléchargement du `.cab`.
    - **NVIDIA** : dernier pilote GeForce via le service web de l'app NVIDIA (installation silencieuse).
+   - **MSI** : page support du modèle de carte mère (service non documenté, association par nom).
    - **Dell / HP / Lenovo** : catalogues publics des outils constructeurs (Dell Command Update, HP Image Assistant,
      Lenovo System Update), filtrés sur le modèle exact du PC.
    - **Autres fabricants** (AMD, Intel, Realtek, Broadcom...) : pas de catalogue public exploitable ; leurs pilotes
