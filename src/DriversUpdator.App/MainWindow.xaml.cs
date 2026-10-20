@@ -85,7 +85,6 @@ public partial class MainWindow : Window
             sources.Add(new DellSource(_http, CacheDir));
             sources.Add(new HpSource(_http, CacheDir));
             sources.Add(new LenovoSource(_http));
-            sources.Add(new MsiSource(_http));
         }
         var matcher = new DriverMatcher(sources, _log);
 

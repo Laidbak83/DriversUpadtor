@@ -6,7 +6,7 @@
         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,2">
             <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,6" Click="Scan_Click"/>
             <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,6" Click="Index_Click"/>
-            <CheckBox x:Name="OnlineCheck" Content="Sources en ligne (Update Catalog, NVIDIA, Dell, HP, Lenovo, MSI)" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
+            <CheckBox x:Name="OnlineCheck" Content="Sources en ligne (Update Catalog, NVIDIA, Dell, HP, Lenovo)" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
             <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,6" Click="Check_Click"/>
             <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,6" Click="Install_Click"/>
             <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,6" Click="Backup_Click"/>
