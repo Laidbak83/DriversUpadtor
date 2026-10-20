@@ -2,6 +2,12 @@
 
 Outil Windows de détection et de mise à jour des pilotes, dans l'esprit de Snappy Driver Installer / DriversCloud.
 
+## Utilisation
+
+1. **Analyser mon PC** : inventaire du matériel puis recherche dans toutes les sources.
+2. Les pilotes à mettre à jour ou manquants sont cochés : **Installer**.
+3. Clic droit sur un périphérique : site du fabricant, recherche Touslesdrivers, copie de l'ID matériel.
+
 ## Fonctionnement
 
 1. **Scan** du matériel via WMI (`Win32_PnPEntity` + `Win32_PnPSignedDriver`) : identifiants matériels, version et date du pilote installé, périphériques sans pilote.

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -7,6 +8,7 @@ using System.Windows.Data;
 using DriversUpdator.Core.Install;
 using DriversUpdator.Core.Machine;
 using DriversUpdator.Core.Matching;
+using DriversUpdator.Core.Models;
 using DriversUpdator.Core.Scanning;
 using DriversUpdator.Core.Sources;
 using DriversUpdator.Core.Sources.Vendors;
@@ -20,7 +22,8 @@ public partial class MainWindow : Window
     private static readonly string CacheDir = Path.Combine(AppDir, "cache");
 
     private readonly ObservableCollection<DeviceRow> _rows = new();
-    private readonly HttpClient _http = new();
+    private readonly ICollectionView _view;
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(60) };
     private readonly UpdateCatalogSource _catalog;
     private readonly DriverInstaller _installer;
     private SdioPackSource _sdio;
@@ -33,51 +36,39 @@ public partial class MainWindow : Window
         _catalog = new UpdateCatalogSource(_http);
         _installer = new DriverInstaller(CacheDir, _http, _catalog);
         _sdio = new SdioPackSource(Path.Combine(AppDir, "packs"), CacheDir);
-        DriverGrid.ItemsSource = _rows;
+
+        _view = CollectionViewSource.GetDefaultView(_rows);
+        _view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(DeviceRow.Category)));
+        _view.SortDescriptions.Add(new SortDescription(nameof(DeviceRow.CategoryOrder), ListSortDirection.Ascending));
+        _view.SortDescriptions.Add(new SortDescription(nameof(DeviceRow.Name), ListSortDirection.Ascending));
+        _view.Filter = FilterRow;
+        DeviceList.ItemsSource = _view;
+
         Loaded += async (_, _) =>
         {
             var sys = await Task.Run(() => SystemInfo.Current);
-            _log.Report($"PC : {sys.Manufacturer} {sys.Model} (SKU {sys.SystemSku}, carte mère {sys.BaseBoardProduct}), Windows build {sys.OsBuild} {sys.OsDisplayVersion}");
+            PcText.Text = $"{sys.Manufacturer} · {sys.BaseBoardProduct} · Windows {(sys.IsWindows11 ? "11" : "10")} {sys.OsDisplayVersion} (build {sys.OsBuild})";
             if (await _sdio.LoadIndexAsync())
-                _log.Report($"Index SDIO chargé : {_sdio.EntryCount} identifiants matériels.");
-            else
-                _log.Report("Aucun index SDIO. Placez les packs .7z dans le dossier 'packs' puis cliquez sur « Indexer ».");
+                _log.Report($"Base hors ligne SDIO chargée : {_sdio.EntryCount} identifiants matériels.");
         };
     }
 
-    private async Task RunBusy(Func<Task> action)
-    {
-        IsEnabled = false;
-        try { await action(); }
-        catch (Exception ex) { _log.Report("Erreur : " + ex.Message); }
-        finally { IsEnabled = true; }
-    }
+    // ───────────── Analyse ─────────────
 
-    private async void Scan_Click(object sender, RoutedEventArgs e) => await RunBusy(async () =>
+    private async void Analyze_Click(object sender, RoutedEventArgs e) => await RunBusy(async () =>
     {
-        _log.Report("Scan du matériel...");
+        SetProgress("Inventaire du matériel…", 0);
         var devices = await DeviceScanner.ScanAsync();
         _rows.Clear();
-        foreach (var d in devices) _rows.Add(new DeviceRow(d) { Status = d.HasDriver ? "" : "Pilote manquant" });
-        _log.Report($"{devices.Count} périphériques détectés, {devices.Count(d => !d.HasDriver)} sans pilote.");
-    });
+        foreach (var d in devices) _rows.Add(new DeviceRow(d));
+        EmptyState.Visibility = Visibility.Collapsed;
 
-    private async void Index_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new OpenFolderDialog { Title = "Dossier contenant les packs SDIO (.7z)" };
-        if (dlg.ShowDialog(this) != true) return;
-        await RunBusy(async () =>
-        {
-            _sdio = new SdioPackSource(dlg.FolderName, CacheDir);
-            await _sdio.BuildIndexAsync(_log);
-        });
-    }
+        // On ne cherche que pour le vrai matériel : volumes, files d'impression, ACPI génériques n'ont pas de pilote constructeur.
+        var toCheck = _rows.Where(r => r.Device.IsHardware).ToList();
+        _log.Report($"{devices.Count} périphériques détectés, {toCheck.Count} composants matériels à vérifier.");
 
-    private async void Check_Click(object sender, RoutedEventArgs e) => await RunBusy(async () =>
-    {
-        if (_rows.Count == 0) { _log.Report("Lancez d'abord le scan."); return; }
-
-        var sources = new List<IDriverSource> { _sdio };
+        var sources = new List<IDriverSource>();
+        if (_sdio.EntryCount > 0) sources.Add(_sdio);
         if (OnlineCheck.IsChecked == true)
         {
             sources.Add(_catalog);
@@ -86,58 +77,116 @@ public partial class MainWindow : Window
             sources.Add(new HpSource(_http, CacheDir));
             sources.Add(new LenovoSource(_http));
         }
+        if (sources.Count == 0) { _log.Report("Aucune source : activez la recherche en ligne ou indexez des packs SDIO."); return; }
         var matcher = new DriverMatcher(sources, _log);
 
-        _log.Report("Recherche des mises à jour...");
-        using var gate = new SemaphoreSlim(4); // limite les requêtes simultanées au catalogue
-        int done = 0, updates = 0;
-        var tasks = _rows.ToList().Select(async row =>
+        using var gate = new SemaphoreSlim(4); // limite les requêtes simultanées
+        int done = 0;
+        await Task.WhenAll(toCheck.Select(async row =>
         {
             await gate.WaitAsync();
             try
             {
                 var r = await matcher.CheckAsync(row.Device);
-                row.Best = r.Best;
-                row.Status = r.IsUpdate ? (row.Device.HasDriver ? "Mise à jour disponible" : "Pilote trouvé") : row.Status;
+                row.Best = r.IsUpdate ? r.Best : null;
+                row.State = r.IsUpdate ? (row.Device.HasDriver ? RowState.Update : RowState.Missing)
+                          : row.Device.HasDriver ? (r.Best is null ? RowState.NotFound : RowState.UpToDate)
+                          : RowState.Missing;
                 row.Selected = r.IsUpdate;
-                if (r.IsUpdate) Interlocked.Increment(ref updates);
             }
             finally
             {
                 gate.Release();
-                if (Interlocked.Increment(ref done) % 20 == 0) _log.Report($"{done}/{_rows.Count} vérifiés...");
+                var n = Interlocked.Increment(ref done);
+                SetProgress($"Vérification {n}/{toCheck.Count}…", 100.0 * n / toCheck.Count);
             }
-        });
-        await Task.WhenAll(tasks);
-        _log.Report($"Périphériques avec au moins un pilote trouvé, par source → {matcher.HitSummary()}");
-        _log.Report($"Terminé : {updates} pilote(s) à installer ou mettre à jour.");
+        }));
+
+        _log.Report($"Résultats par source → {matcher.HitSummary()}");
+        RefreshSummary();
+        SetProgress(null, null);
     });
+
+    private void RefreshSummary()
+    {
+        var hw = _rows.Where(r => r.Device.IsHardware).ToList();
+        UpdatesCount.Text = hw.Count(r => r.State == RowState.Update).ToString();
+        MissingCount.Text = hw.Count(r => r.State == RowState.Missing).ToString();
+        UpToDateCount.Text = hw.Count(r => r.State is RowState.UpToDate or RowState.NotFound or RowState.Installed).ToString();
+        HardwareCount.Text = hw.Count.ToString();
+        _view.Refresh();
+        Selection_Changed(this, new RoutedEventArgs());
+    }
+
+    // ───────────── Installation ─────────────
 
     private async void Install_Click(object sender, RoutedEventArgs e) => await RunBusy(async () =>
     {
         var selected = _rows.Where(r => r.Selected && r.Best is not null).ToList();
-        if (selected.Count == 0) { _log.Report("Rien de sélectionné."); return; }
+        if (selected.Count == 0) return;
 
-        if (MessageBox.Show(this, $"Installer {selected.Count} pilote(s) ?\nUn point de restauration sera créé avant.",
+        var list = string.Join("\n", selected.Select(r => $"• {r.Name}  →  {r.Best!.Version}"));
+        if (MessageBox.Show(this, $"Installer {selected.Count} pilote(s) ?\n\n{list}\n\nUn point de restauration sera créé avant.",
                 "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
-        _log.Report("Création du point de restauration...");
+        SetProgress("Création du point de restauration…", 0);
         var ok = await Task.Run(() => DriverInstaller.CreateRestorePoint("DriversUpdator - avant mise à jour des pilotes"));
         _log.Report(ok ? "Point de restauration créé." : "Impossible de créer le point de restauration (protection système désactivée ?).");
-        if (!ok && MessageBox.Show(this, "Continuer sans point de restauration ?", "Attention",
+        if (!ok && MessageBox.Show(this, "Le point de restauration n'a pas pu être créé.\nContinuer quand même ?", "Attention",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
 
+        int i = 0;
+        bool needsReboot = false;
         foreach (var row in selected)
         {
-            row.Status = "Installation...";
-            _log.Report($"→ {row.Name}");
-            var (success, output) = await _installer.InstallAsync(row.Best!, _log);
-            row.Status = success ? "Installé" : "Échec";
+            SetProgress($"Installation {++i}/{selected.Count} : {row.Name}", 100.0 * (i - 1) / selected.Count);
+            row.State = RowState.Installing;
+            _log.Report($"→ {row.Name} ({row.Best!.SourceName} {row.Best.Version})");
+            try
+            {
+                var (success, output) = await _installer.InstallAsync(row.Best, _log);
+                row.State = success ? RowState.Installed : RowState.Failed;
+                needsReboot |= output.Contains("3010") || output.Contains("redémarr", StringComparison.OrdinalIgnoreCase);
+                _log.Report(output.Trim());
+            }
+            catch (Exception ex)
+            {
+                row.State = RowState.Failed;
+                _log.Report("Échec : " + ex.Message);
+            }
             row.Selected = false;
-            _log.Report(output.Trim());
         }
-        _log.Report("Installation terminée. Un redémarrage peut être nécessaire.");
+        SetProgress(null, null);
+        RefreshSummary();
+
+        var failed = selected.Count(r => r.State == RowState.Failed);
+        MessageBox.Show(this,
+            $"{selected.Count - failed} pilote(s) installé(s)" + (failed > 0 ? $", {failed} échec(s) (voir le journal)." : ".")
+            + (needsReboot ? "\n\nRedémarrez le PC pour terminer l'installation." : ""),
+            "Installation terminée", MessageBoxButton.OK, failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
     });
+
+    private void Selection_Changed(object sender, RoutedEventArgs e)
+    {
+        var n = _rows.Count(r => r.Selected);
+        InstallButton.IsEnabled = n > 0;
+        InstallButtonText.Text = n > 0 ? $"Installer ({n})" : "Installer la sélection";
+    }
+
+    // ───────────── Outils ─────────────
+
+    private async void Index_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFolderDialog { Title = "Dossier contenant les packs SDIO (.7z)" };
+        if (dlg.ShowDialog(this) != true) return;
+        await RunBusy(async () =>
+        {
+            SetProgress("Indexation des packs SDIO…", null);
+            _sdio = new SdioPackSource(dlg.FolderName, CacheDir);
+            await _sdio.BuildIndexAsync(_log);
+            SetProgress(null, null);
+        });
+    }
 
     private async void Backup_Click(object sender, RoutedEventArgs e)
     {
@@ -146,33 +195,77 @@ public partial class MainWindow : Window
         await RunBusy(async () =>
         {
             var target = Path.Combine(dlg.FolderName, $"Pilotes_{DateTime.Now:yyyyMMdd_HHmm}");
-            _log.Report($"Sauvegarde vers {target}...");
+            SetProgress("Sauvegarde des pilotes…", null);
             var (code, _) = await DriverInstaller.BackupAllAsync(target);
-            _log.Report(code == 0 ? "Sauvegarde terminée." : $"pnputil a renvoyé le code {code}.");
+            SetProgress(null, null);
+            _log.Report(code == 0 ? $"Pilotes sauvegardés dans {target}" : $"pnputil a renvoyé le code {code}.");
         });
     }
 
-    private void Web_Click(object sender, RoutedEventArgs e)
+    private void OpenCache_Click(object sender, RoutedEventArgs e)
     {
-        if (DriverGrid.SelectedItem is not DeviceRow row) { _log.Report("Sélectionnez un périphérique dans la liste."); return; }
-        var query = Uri.EscapeDataString($"site:touslesdrivers.com {row.Name}");
-        Process.Start(new ProcessStartInfo($"https://duckduckgo.com/?q={query}") { UseShellExecute = true });
+        Directory.CreateDirectory(CacheDir);
+        Process.Start(new ProcessStartInfo(CacheDir) { UseShellExecute = true });
     }
 
     private void Vendor_Click(object sender, RoutedEventArgs e)
     {
-        if (DriverGrid.SelectedItem is not DeviceRow row) { _log.Report("Sélectionnez un périphérique dans la liste."); return; }
+        if (DeviceList.SelectedItem is not DeviceRow row) return;
         var vendor = VendorDirectory.Find(row.Device);
-        if (vendor is null) { _log.Report("Fabricant inconnu pour ce périphérique."); return; }
-        _log.Report($"Ouverture du site {vendor.Name}...");
-        Process.Start(new ProcessStartInfo(vendor.DriversUrl) { UseShellExecute = true });
+        if (vendor is null) { _log.Report($"Fabricant inconnu pour {row.Name}."); return; }
+        OpenUrl(vendor.DriversUrl);
     }
 
-    private void Filter_Changed(object sender, RoutedEventArgs e)
+    private void Web_Click(object sender, RoutedEventArgs e)
     {
-        var view = CollectionViewSource.GetDefaultView(_rows);
-        view.Filter = OnlyUpdatesCheck.IsChecked == true
-            ? o => o is DeviceRow r && (!r.Device.HasDriver || r.Best is not null && r.Selected)
-            : null;
+        if (DeviceList.SelectedItem is not DeviceRow row) return;
+        OpenUrl("https://duckduckgo.com/?q=" + Uri.EscapeDataString($"site:touslesdrivers.com {row.Name}"));
     }
+
+    private void CopyId_Click(object sender, RoutedEventArgs e)
+    {
+        if (DeviceList.SelectedItem is DeviceRow row) Clipboard.SetText(row.HardwareId);
+    }
+
+    // ───────────── Affichage ─────────────
+
+    private bool FilterRow(object o)
+    {
+        if (o is not DeviceRow r) return false;
+        return FilterBox.SelectedIndex switch
+        {
+            0 => r.State is RowState.Update or RowState.Missing or RowState.Installing or RowState.Installed or RowState.Failed,
+            1 => r.Device.IsHardware,
+            _ => true,
+        };
+    }
+
+    private void Filter_Changed(object sender, RoutedEventArgs e) => _view?.Refresh();
+
+    private void SetProgress(string? text, double? percent)
+    {
+        ProgressText.Text = text ?? "";
+        Progress.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
+        Progress.IsIndeterminate = percent is null;
+        if (percent is not null) Progress.Value = percent.Value;
+    }
+
+    private async Task RunBusy(Func<Task> action)
+    {
+        AnalyzeButton.IsEnabled = InstallButton.IsEnabled = false;
+        try { await action(); }
+        catch (Exception ex)
+        {
+            _log.Report("Erreur : " + ex.Message);
+            MessageBox.Show(this, ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetProgress(null, null);
+            AnalyzeButton.IsEnabled = true;
+            Selection_Changed(this, new RoutedEventArgs());
+        }
+    }
+
+    private static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 }

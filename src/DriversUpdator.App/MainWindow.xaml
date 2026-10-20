@@ -1,33 +1,175 @@
 <Window x:Class="DriversUpdator.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DriversUpdator" Height="650" Width="1150" WindowStartupLocation="CenterScreen">
-    <DockPanel Margin="8">
-        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,2">
-            <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,6" Click="Scan_Click"/>
-            <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,6" Click="Index_Click"/>
-            <CheckBox x:Name="OnlineCheck" Content="Sources en ligne (Update Catalog, NVIDIA, Dell, HP, Lenovo)" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
-            <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,6" Click="Check_Click"/>
-            <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,6" Click="Install_Click"/>
-            <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,6" Click="Backup_Click"/>
-            <Button Content="Site du fabricant" Padding="10,4" Margin="0,0,6,6" Click="Vendor_Click"/>
-            <Button Content="Chercher sur Touslesdrivers" Padding="10,4" Margin="0,0,6,6" Click="Web_Click"/>
-        </WrapPanel>
-        <TextBox x:Name="LogBox" DockPanel.Dock="Bottom" Height="110" IsReadOnly="True"
-                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,8,0,0"/>
-        <CheckBox x:Name="OnlyUpdatesCheck" DockPanel.Dock="Top" Content="N'afficher que les pilotes à mettre à jour / manquants"
-                  Margin="0,0,0,6" Checked="Filter_Changed" Unchecked="Filter_Changed"/>
-        <DataGrid x:Name="DriverGrid" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single">
-            <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="30"/>
-                <DataGridTextColumn Header="Périphérique" Binding="{Binding Name}" Width="2*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Classe" Binding="{Binding ClassName}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Installé" Binding="{Binding Installed}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Disponible" Binding="{Binding Available}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="90" IsReadOnly="True"/>
-                <DataGridTextColumn Header="État" Binding="{Binding Status}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="ID matériel" Binding="{Binding HardwareId}" Width="2*" IsReadOnly="True"/>
-            </DataGrid.Columns>
-        </DataGrid>
-    </DockPanel>
+        Title="DriversUpdator" Height="780" Width="1180" MinWidth="820" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="24,16,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tête : titre, PC, actions principales -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="AnalyzeButton" Style="{DynamicResource AccentButtonStyle}" Padding="18,8" Margin="0,0,8,0" Click="Analyze_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE721;" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Analyser mon PC"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="InstallButton" Padding="18,8" IsEnabled="False" Click="Install_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE896;" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="InstallButtonText" Text="Installer la sélection"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="DriversUpdator" FontSize="26" FontWeight="SemiBold"/>
+                <TextBlock x:Name="PcText" Text="Détection du PC…" Style="{StaticResource Secondary}" FontSize="13" Margin="0,2,0,0"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Tuiles de résumé -->
+        <UniformGrid Grid.Row="1" Rows="1" Margin="0,0,-12,16">
+            <Border Style="{StaticResource TileStyle}">
+                <StackPanel>
+                    <TextBlock x:Name="UpdatesCount" Text="–" Style="{StaticResource TileNumber}" Foreground="#CA5010"/>
+                    <TextBlock Text="Mises à jour disponibles" Style="{StaticResource TileLabel}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource TileStyle}">
+                <StackPanel>
+                    <TextBlock x:Name="MissingCount" Text="–" Style="{StaticResource TileNumber}" Foreground="#C42B1C"/>
+                    <TextBlock Text="Pilotes manquants" Style="{StaticResource TileLabel}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource TileStyle}">
+                <StackPanel>
+                    <TextBlock x:Name="UpToDateCount" Text="–" Style="{StaticResource TileNumber}" Foreground="SeaGreen"/>
+                    <TextBlock Text="Pilotes à jour" Style="{StaticResource TileLabel}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource TileStyle}">
+                <StackPanel>
+                    <TextBlock x:Name="HardwareCount" Text="–" Style="{StaticResource TileNumber}"/>
+                    <TextBlock Text="Composants analysés" Style="{StaticResource TileLabel}"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- Filtres et progression -->
+        <DockPanel Grid.Row="2" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <TextBlock Text="Afficher :" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="FilterBox" Width="230" SelectedIndex="0" SelectionChanged="Filter_Changed">
+                    <ComboBoxItem Content="À traiter (mises à jour, manquants)"/>
+                    <ComboBoxItem Content="Tout le matériel"/>
+                    <ComboBoxItem Content="Tous les périphériques Windows"/>
+                </ComboBox>
+                <CheckBox x:Name="OnlineCheck" IsChecked="True" Margin="16,0,0,0" VerticalAlignment="Center"
+                          Content="Rechercher en ligne" ToolTip="Microsoft Update Catalog, NVIDIA, Dell, HP, Lenovo"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock x:Name="ProgressText" Style="{StaticResource Secondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ProgressBar x:Name="Progress" Width="200" Height="4" Visibility="Collapsed"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Liste des périphériques, groupés par catégorie -->
+        <Border Grid.Row="3" CornerRadius="8" BorderThickness="1"
+                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+            <Grid>
+                <ListView x:Name="DeviceList" BorderThickness="0" Background="Transparent"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          VirtualizingPanel.IsVirtualizingWhenGrouping="True">
+                    <ListView.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Ouvrir le site du fabricant" Click="Vendor_Click"/>
+                            <MenuItem Header="Chercher sur Touslesdrivers" Click="Web_Click"/>
+                            <MenuItem Header="Copier l'identifiant matériel" Click="CopyId_Click"/>
+                        </ContextMenu>
+                    </ListView.ContextMenu>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Padding" Value="8,6"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="12,14,0,4">
+                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding ItemCount, StringFormat='  ({0})'}" Opacity="0.6" FontSize="15"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListView.GroupStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ToolTip="{Binding Details}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="3*"/>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="150"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox IsChecked="{Binding Selected}" IsEnabled="{Binding CanInstall}" VerticalAlignment="Center"
+                                          MinWidth="0" Checked="Selection_Changed" Unchecked="Selection_Changed"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Icon}" FontFamily="{StaticResource IconFont}" FontSize="20"
+                                           VerticalAlignment="Center" Opacity="0.8"/>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Vendor}" Style="{StaticResource Secondary}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="Installé" Style="{StaticResource Secondary}"/>
+                                    <TextBlock Text="{Binding Installed}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="Disponible" Style="{StaticResource Secondary}"/>
+                                    <TextBlock Text="{Binding Available}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <Border Grid.Column="5" Background="{Binding StateBrush}" CornerRadius="10" Padding="10,3"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding StateText}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <!-- Écran d'accueil avant la première analyse -->
+                <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="48" HorizontalAlignment="Center" Opacity="0.5"/>
+                    <TextBlock Text="Cliquez sur « Analyser mon PC » pour vérifier vos pilotes." FontSize="16" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Un point de restauration est créé avant chaque installation." Style="{StaticResource Secondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Outils et journal -->
+        <Expander Grid.Row="4" Header="Outils et journal" Margin="0,12,0,0">
+            <DockPanel Margin="0,8,0,0">
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button Content="Sauvegarder mes pilotes…" Padding="12,5" Margin="0,0,8,0" Click="Backup_Click"/>
+                    <Button Content="Indexer des packs SDIO…" Padding="12,5" Margin="0,0,8,0" Click="Index_Click"
+                            ToolTip="Base hors ligne de Snappy Driver Installer Origin (fichiers .7z)"/>
+                    <Button Content="Ouvrir le dossier des téléchargements" Padding="12,5" Click="OpenCache_Click"/>
+                </WrapPanel>
+                <TextBox x:Name="LogBox" Height="140" IsReadOnly="True" TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas" FontSize="12"/>
+            </DockPanel>
+        </Expander>
+    </Grid>
 </Window>

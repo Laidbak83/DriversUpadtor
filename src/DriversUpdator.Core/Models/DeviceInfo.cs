@@ -22,6 +22,20 @@ public sealed class DeviceInfo
 
     public bool HasDriver => InstalledVersion is not null && ProblemCode != 28;
 
+    /// <summary>
+    /// Vrai pour le matériel réel d'un fabricant (PCI, USB, audio...). Faux pour les périphériques
+    /// virtuels ou purement Windows (volumes, files d'impression, ACPI génériques) : inutile de les chercher.
+    /// </summary>
+    public bool IsHardware => !HasDriver || HardwareIds.Any(id =>
+        (id.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase)
+         || id.StartsWith(@"USB\", StringComparison.OrdinalIgnoreCase)
+         || id.StartsWith(@"HDAUDIO\", StringComparison.OrdinalIgnoreCase)
+         || id.StartsWith(@"BTH", StringComparison.OrdinalIgnoreCase)
+         || id.StartsWith(@"HID\VID_", StringComparison.OrdinalIgnoreCase)
+         || id.StartsWith(@"ACPI\VEN_", StringComparison.OrdinalIgnoreCase))
+        && !id.Contains("VEN_MSFT", StringComparison.OrdinalIgnoreCase)
+        && !id.Contains("VEN_PNP", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Tous les identifiants dans l'ordre de priorité de Windows.</summary>
     public IEnumerable<string> AllIds => HardwareIds.Concat(CompatibleIds);
 }

@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>DriversUpdator</AssemblyName>
+    <!-- ThemeMode (thème Fluent Windows 11) est encore marqué expérimental dans WPF. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DriversUpdator.Core\DriversUpdator.Core.csproj" />

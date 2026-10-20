@@ -72,14 +72,25 @@ public sealed partial class UpdateCatalogSource : IDriverSource
                 .ToList();
             // Colonnes : [case], Titre, Produits, Classification, Dernière mise à jour, Version, Taille, [bouton]
             if (cells.Count < 7) continue;
+            var title = cells[1];
+            var products = string.Join(" | ", cells.Skip(2).Take(2));
 
+            // On ne garde que les pilotes pour Windows 10/11 (le catalogue contient aussi XP, 7, 8.1...).
+            if (!products.Contains("Windows 1", StringComparison.OrdinalIgnoreCase)) continue;
+            // ARM64 ne nous concerne pas sur un PC x64.
+            if (title.Contains("ARM64", StringComparison.OrdinalIgnoreCase)) continue;
+
+            // Pour les pilotes, la colonne Version vaut souvent "n/a" : la version est en fin de titre
+            // (ex. "Intel - System - 10/3/2016 12:00:00 AM - 30.100.1634.2").
+            var version = DriverVersion.TryParse(cells[5]) ?? DriverVersion.TryParse(TitleVersionRegex().Match(title).Groups[1].Value);
             DateTime.TryParse(cells[4], CultureInfo.GetCultureInfo("en-US"), DateTimeStyles.None, out var date);
+
             list.Add(new DriverCandidate
             {
                 SourceName = Name,
                 MatchedId = hardwareId,
-                Description = cells[1],
-                Version = DriverVersion.TryParse(cells[5]),
+                Description = title,
+                Version = version,
                 Date = date == default ? null : date,
                 DownloadUrl = "catalog:" + updateId, // résolu au moment de l'installation
             });
@@ -103,6 +114,9 @@ public sealed partial class UpdateCatalogSource : IDriverSource
 
     [GeneratedRegex("<td[^>]*>(.*?)</td>", RegexOptions.Singleline)]
     private static partial Regex CellRegex();
+
+    [GeneratedRegex(@"-\s*(\d+(?:\.\d+){1,3})\s*$")]
+    private static partial Regex TitleVersionRegex();
 
     [GeneratedRegex("<[^>]+>")]
     private static partial Regex TagRegex();
