@@ -11,6 +11,14 @@ public sealed class DriverMatcher
     private readonly IReadOnlyList<IDriverSource> _sources;
     private readonly IProgress<string>? _log;
     private readonly HashSet<string> _reportedFailures = new();
+    private readonly Dictionary<string, int> _hits = new();
+
+    /// <summary>Nombre de pilotes proposés par chaque source (pour le diagnostic).</summary>
+    public string HitSummary()
+    {
+        lock (_hits)
+            return string.Join(", ", _sources.Select(s => $"{s.Name} : {_hits.GetValueOrDefault(s.Name)}"));
+    }
 
     public DriverMatcher(IEnumerable<IDriverSource> sources, IProgress<string>? log = null)
     {
@@ -23,7 +31,13 @@ public sealed class DriverMatcher
         var all = new List<DriverCandidate>();
         foreach (var source in _sources.Where(s => s.Supports(device)))
         {
-            try { all.AddRange(await source.FindAsync(device, ct)); }
+            try
+            {
+                var found = await source.FindAsync(device, ct);
+                all.AddRange(found);
+                if (found.Count > 0)
+                    lock (_hits) _hits[source.Name] = _hits.GetValueOrDefault(source.Name) + 1;
+            }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {

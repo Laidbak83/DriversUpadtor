@@ -110,6 +110,7 @@ public partial class MainWindow : Window
             }
         });
         await Task.WhenAll(tasks);
+        _log.Report($"Périphériques avec au moins un pilote trouvé, par source → {matcher.HitSummary()}");
         _log.Report($"Terminé : {updates} pilote(s) à installer ou mettre à jour.");
     });
 

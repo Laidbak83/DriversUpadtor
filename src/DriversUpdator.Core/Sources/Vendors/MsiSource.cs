@@ -71,7 +71,17 @@ public sealed partial class MsiSource : IDriverSource
     {
         var slug = ProductSlug(SystemInfo.Current.BaseBoardProduct);
         var url = $"https://www.msi.com/api/v1/product/support/panel?product={Uri.EscapeDataString(slug)}&type=driver";
-        using var doc = JsonDocument.Parse(await _http.GetStringAsync(url, ct));
+        // Le site refuse (403) les requêtes qui ne ressemblent pas à celles de sa propre page support.
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.TryAddWithoutValidation("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+        req.Headers.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+        req.Headers.TryAddWithoutValidation("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8");
+        req.Headers.TryAddWithoutValidation("Referer", $"https://www.msi.com/Motherboard/{slug}/support");
+        req.Headers.TryAddWithoutValidation("X-Requested-With", "XMLHttpRequest");
+        using var resp = await _http.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
 
         var os = SystemInfo.Current.IsWindows11 ? "11" : "10";
         var result = new List<Package>();
