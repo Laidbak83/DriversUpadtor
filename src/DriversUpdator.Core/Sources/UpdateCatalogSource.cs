@@ -31,10 +31,22 @@ public sealed partial class UpdateCatalogSource : IDriverSource
         // Les IDs compatibles (classes génériques) donneraient trop de bruit.
         foreach (var id in CatalogQueries(device))
         {
-            var results = await SearchAsync(id, ct);
+            var results = (await SearchAsync(id, ct)).Where(c => ClassMatches(c, device)).ToList();
             if (results.Count > 0) return results;
         }
         return Array.Empty<DriverCandidate>();
+    }
+
+    /// <summary>
+    /// La recherche du catalogue est en texte libre et renvoie parfois d'autres pilotes du même fabricant
+    /// (ex. un pilote graphique Intel pour un contrôleur RAID Intel). Les titres suivent la forme
+    /// "Fabricant - Classe - Version" : on exige que la classe soit celle du périphérique.
+    /// </summary>
+    private static bool ClassMatches(DriverCandidate c, DeviceInfo device)
+    {
+        if (string.IsNullOrEmpty(device.ClassName)) return true; // pilote manquant : classe inconnue
+        var parts = c.Description.Split(" - ", StringSplitOptions.TrimEntries);
+        return parts.Length < 3 || parts[1].Equals(device.ClassName, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
