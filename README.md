@@ -14,7 +14,7 @@ Outil Windows de détection et de mise à jour des pilotes, dans l'esprit de Sna
 
 ## Prérequis
 
-- Windows 10/11 x64, [SDK .NET 8](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Windows 10/11 x64, [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [7-Zip](https://www.7-zip.org) (pour décompresser les packs SDIO)
 - Les driverpacks SDIO (téléchargeables depuis https://www.glenn.delahoy.com/snappy-driver-installer-origin/ ou sdi-tool.org), à placer dans le dossier `packs` à côté de l'exécutable, ou à choisir via « Indexer les packs SDIO… ».
 
