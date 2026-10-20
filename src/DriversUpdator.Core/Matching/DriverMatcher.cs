@@ -43,7 +43,8 @@ public sealed class DriverMatcher
     {
         if (c is null) return false;
         if (!d.HasDriver) return true;
-        if (c.Version is not null && d.InstalledVersion is not null) return c.Version > d.InstalledVersion;
-        return c.Date is not null && d.InstalledDate is not null && c.Date > d.InstalledDate;
+        // Les pilotes intégrés à Windows portent tous la date fictive du 21/06/2006 :
+        // la date n'est pas fiable, on ne compare que les versions.
+        return c.Version is not null && d.InstalledVersion is not null && c.Version > d.InstalledVersion;
     }
 }
