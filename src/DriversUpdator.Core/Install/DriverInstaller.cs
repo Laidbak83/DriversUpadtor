@@ -53,6 +53,10 @@ public sealed class DriverInstaller
         {
             infArgument = $"\"{candidate.LocalInfPath}\"";
         }
+        else if (candidate.DownloadUrl is not null && IsExecutable(candidate.DownloadUrl))
+        {
+            return await RunVendorInstallerAsync(candidate, progress, ct);
+        }
         else if (candidate.DownloadUrl is not null)
         {
             var folder = await DownloadAndExtractAsync(candidate, progress, ct);
@@ -69,6 +73,36 @@ public sealed class DriverInstaller
         return (code is 0 or 3010, output);
     }
 
+    private static bool IsExecutable(string url)
+        => !url.StartsWith("catalog:", StringComparison.Ordinal)
+           && Path.GetExtension(new Uri(url).LocalPath).Equals(".exe", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Installeur constructeur (.exe) : silencieux si on connaît les arguments, sinon assistant normal.</summary>
+    private async Task<(bool, string)> RunVendorInstallerAsync(DriverCandidate c, IProgress<string>? progress, CancellationToken ct)
+    {
+        var file = await DownloadAsync(c.DownloadUrl!, progress, ct);
+        progress?.Report(c.InstallerArguments is null
+            ? "Lancement de l'installeur, suivez l'assistant..."
+            : "Installation silencieuse en cours (cela peut prendre plusieurs minutes)...");
+
+        var psi = new ProcessStartInfo(file, c.InstallerArguments ?? "") { UseShellExecute = c.InstallerArguments is null };
+        using var p = Process.Start(psi)!;
+        await p.WaitForExitAsync(ct);
+        return (p.ExitCode is 0 or 3010 or 1641, $"{Path.GetFileName(file)} terminé (code {p.ExitCode}).");
+    }
+
+    private async Task<string> DownloadAsync(string url, IProgress<string>? progress, CancellationToken ct)
+    {
+        Directory.CreateDirectory(_downloadDir);
+        var fileName = Path.GetFileName(new Uri(url).LocalPath);
+        var file = Path.Combine(_downloadDir, fileName);
+        progress?.Report($"Téléchargement de {fileName}...");
+        await using (var src = await _http.GetStreamAsync(url, ct))
+        await using (var dst = File.Create(file))
+            await src.CopyToAsync(dst, ct);
+        return file;
+    }
+
     private async Task<string> DownloadAndExtractAsync(DriverCandidate c, IProgress<string>? progress, CancellationToken ct)
     {
         var url = c.DownloadUrl!;
@@ -78,14 +112,8 @@ public sealed class DriverInstaller
                   ?? throw new InvalidOperationException("Lien de téléchargement introuvable sur le catalogue.");
         }
 
-        Directory.CreateDirectory(_downloadDir);
-        var fileName = Path.GetFileName(new Uri(url).LocalPath);
-        var file = Path.Combine(_downloadDir, fileName);
-        progress?.Report($"Téléchargement de {fileName}...");
-        await using (var src = await _http.GetStreamAsync(url, ct))
-        await using (var dst = File.Create(file))
-            await src.CopyToAsync(dst, ct);
-
+        var file = await DownloadAsync(url, progress, ct);
+        var fileName = Path.GetFileName(file);
         var target = Path.Combine(_downloadDir, Path.GetFileNameWithoutExtension(fileName));
         Directory.CreateDirectory(target);
         progress?.Report("Décompression...");

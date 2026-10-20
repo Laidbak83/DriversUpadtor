@@ -5,9 +5,11 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Data;
 using DriversUpdator.Core.Install;
+using DriversUpdator.Core.Machine;
 using DriversUpdator.Core.Matching;
 using DriversUpdator.Core.Scanning;
 using DriversUpdator.Core.Sources;
+using DriversUpdator.Core.Sources.Vendors;
 using Microsoft.Win32;
 
 namespace DriversUpdator.App;
@@ -34,6 +36,8 @@ public partial class MainWindow : Window
         DriverGrid.ItemsSource = _rows;
         Loaded += async (_, _) =>
         {
+            var sys = await Task.Run(() => SystemInfo.Current);
+            _log.Report($"PC : {sys.Manufacturer} {sys.Model} (SKU {sys.SystemSku}, carte mère {sys.BaseBoardProduct}), Windows build {sys.OsBuild} {sys.OsDisplayVersion}");
             if (await _sdio.LoadIndexAsync())
                 _log.Report($"Index SDIO chargé : {_sdio.EntryCount} identifiants matériels.");
             else
@@ -74,8 +78,15 @@ public partial class MainWindow : Window
         if (_rows.Count == 0) { _log.Report("Lancez d'abord le scan."); return; }
 
         var sources = new List<IDriverSource> { _sdio };
-        if (OnlineCheck.IsChecked == true) sources.Add(_catalog);
-        var matcher = new DriverMatcher(sources);
+        if (OnlineCheck.IsChecked == true)
+        {
+            sources.Add(_catalog);
+            sources.Add(new NvidiaSource(_http));
+            sources.Add(new DellSource(_http, CacheDir));
+            sources.Add(new HpSource(_http, CacheDir));
+            sources.Add(new LenovoSource(_http));
+        }
+        var matcher = new DriverMatcher(sources, _log);
 
         _log.Report("Recherche des mises à jour...");
         using var gate = new SemaphoreSlim(4); // limite les requêtes simultanées au catalogue
@@ -145,6 +156,15 @@ public partial class MainWindow : Window
         if (DriverGrid.SelectedItem is not DeviceRow row) { _log.Report("Sélectionnez un périphérique dans la liste."); return; }
         var query = Uri.EscapeDataString($"site:touslesdrivers.com {row.Name}");
         Process.Start(new ProcessStartInfo($"https://duckduckgo.com/?q={query}") { UseShellExecute = true });
+    }
+
+    private void Vendor_Click(object sender, RoutedEventArgs e)
+    {
+        if (DriverGrid.SelectedItem is not DeviceRow row) { _log.Report("Sélectionnez un périphérique dans la liste."); return; }
+        var vendor = VendorDirectory.Find(row.Device);
+        if (vendor is null) { _log.Report("Fabricant inconnu pour ce périphérique."); return; }
+        _log.Report($"Ouverture du site {vendor.Name}...");
+        Process.Start(new ProcessStartInfo(vendor.DriversUrl) { UseShellExecute = true });
     }
 
     private void Filter_Changed(object sender, RoutedEventArgs e)

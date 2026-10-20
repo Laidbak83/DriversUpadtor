@@ -15,6 +15,12 @@ public sealed class DriverCandidate
     /// <summary>URL de téléchargement (.cab, .zip, .exe) pour les sources en ligne.</summary>
     public string? DownloadUrl { get; init; }
 
+    /// <summary>
+    /// Pour un installeur .exe : arguments d'installation silencieuse.
+    /// Null = l'installeur est lancé normalement et l'utilisateur suit l'assistant.
+    /// </summary>
+    public string? InstallerArguments { get; init; }
+
     /// <summary>Rang de correspondance : plus petit = plus précis (index dans la liste des IDs).</summary>
     public int MatchRank { get; set; }
 }

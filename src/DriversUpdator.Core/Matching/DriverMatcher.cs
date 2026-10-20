@@ -9,8 +9,14 @@ public sealed record UpdateResult(DeviceInfo Device, DriverCandidate? Best, bool
 public sealed class DriverMatcher
 {
     private readonly IReadOnlyList<IDriverSource> _sources;
+    private readonly IProgress<string>? _log;
+    private readonly HashSet<string> _reportedFailures = new();
 
-    public DriverMatcher(IEnumerable<IDriverSource> sources) => _sources = sources.ToList();
+    public DriverMatcher(IEnumerable<IDriverSource> sources, IProgress<string>? log = null)
+    {
+        _sources = sources.ToList();
+        _log = log;
+    }
 
     public async Task<UpdateResult> CheckAsync(DeviceInfo device, CancellationToken ct = default)
     {
@@ -19,7 +25,14 @@ public sealed class DriverMatcher
         {
             try { all.AddRange(await source.FindAsync(device, ct)); }
             catch (OperationCanceledException) { throw; }
-            catch { /* une source en panne ne doit pas bloquer les autres */ }
+            catch (Exception ex)
+            {
+                // Une source en panne ne doit pas bloquer les autres ; on la signale une seule fois.
+                lock (_reportedFailures)
+                {
+                    if (_reportedFailures.Add(source.Name)) _log?.Report($"Source {source.Name} en erreur : {ex.Message}");
+                }
+            }
         }
 
         var ids = device.AllIds.ToList();

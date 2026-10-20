@@ -8,6 +8,11 @@ Outil Windows de détection et de mise à jour des pilotes, dans l'esprit de Sna
 2. **Recherche** dans plusieurs sources, puis choix du meilleur pilote (identifiant le plus précis, puis le plus récent) :
    - **Packs SDIO** (Snappy Driver Installer Origin) : base hors ligne. Les `.7z` sont décompressés avec 7-Zip puis tous les `.inf` sont indexés (`cache/sdio-index.json`).
    - **Microsoft Update Catalog** : recherche en ligne par identifiant matériel, téléchargement du `.cab`.
+   - **NVIDIA** : dernier pilote GeForce via le service web de l'app NVIDIA (installation silencieuse).
+   - **Dell / HP / Lenovo** : catalogues publics des outils constructeurs (Dell Command Update, HP Image Assistant,
+     Lenovo System Update), filtrés sur le modèle exact du PC.
+   - **Autres fabricants** (AMD, Intel, Realtek, Broadcom...) : pas de catalogue public exploitable ; leurs pilotes
+     passent par Update Catalog / SDIO, et le bouton « Site du fabricant » ouvre leur page officielle.
 3. **Installation** avec `pnputil /add-driver ... /install`, après création d'un point de restauration.
 4. **Sauvegarde** des pilotes actuels (`pnputil /export-driver *`).
 5. Bouton **Chercher sur Touslesdrivers** pour une recherche manuelle.
@@ -41,4 +46,4 @@ Implémenter `IDriverSource` (`src/DriversUpdator.Core/Sources/IDriverSource.cs`
 `FindAsync(device)` renvoie des `DriverCandidate` (version, date, URL). Puis l'ajouter à la liste
 des sources dans `MainWindow.Check_Click`.
 
-Prévu : NVIDIA, AMD, Intel, Realtek.
+Sources existantes : `src/DriversUpdator.Core/Sources/Vendors/`.

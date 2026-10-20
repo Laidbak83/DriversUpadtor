@@ -6,10 +6,11 @@
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
             <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,0" Click="Scan_Click"/>
             <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,0" Click="Index_Click"/>
-            <CheckBox x:Name="OnlineCheck" Content="Chercher aussi sur Update Catalog" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
+            <CheckBox x:Name="OnlineCheck" Content="Sources en ligne (Update Catalog, NVIDIA, Dell, HP, Lenovo)" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
             <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,0" Click="Check_Click"/>
             <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,0" Click="Install_Click"/>
             <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,0" Click="Backup_Click"/>
+            <Button Content="Site du fabricant" Padding="10,4" Margin="0,0,6,0" Click="Vendor_Click"/>
             <Button Content="Chercher sur Touslesdrivers" Padding="10,4" Click="Web_Click"/>
         </StackPanel>
         <TextBox x:Name="LogBox" DockPanel.Dock="Bottom" Height="110" IsReadOnly="True"
