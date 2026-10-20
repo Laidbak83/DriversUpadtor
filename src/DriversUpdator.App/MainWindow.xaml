@@ -3,16 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="DriversUpdator" Height="650" Width="1150" WindowStartupLocation="CenterScreen">
     <DockPanel Margin="8">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,0" Click="Scan_Click"/>
-            <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,0" Click="Index_Click"/>
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,2">
+            <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,6" Click="Scan_Click"/>
+            <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,6" Click="Index_Click"/>
             <CheckBox x:Name="OnlineCheck" Content="Sources en ligne (Update Catalog, NVIDIA, Dell, HP, Lenovo)" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
-            <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,0" Click="Check_Click"/>
-            <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,0" Click="Install_Click"/>
-            <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,0" Click="Backup_Click"/>
-            <Button Content="Site du fabricant" Padding="10,4" Margin="0,0,6,0" Click="Vendor_Click"/>
-            <Button Content="Chercher sur Touslesdrivers" Padding="10,4" Click="Web_Click"/>
-        </StackPanel>
+            <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,6" Click="Check_Click"/>
+            <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,6" Click="Install_Click"/>
+            <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,6" Click="Backup_Click"/>
+            <Button Content="Site du fabricant" Padding="10,4" Margin="0,0,6,6" Click="Vendor_Click"/>
+            <Button Content="Chercher sur Touslesdrivers" Padding="10,4" Margin="0,0,6,6" Click="Web_Click"/>
+        </WrapPanel>
         <TextBox x:Name="LogBox" DockPanel.Dock="Bottom" Height="110" IsReadOnly="True"
                  VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,8,0,0"/>
         <CheckBox x:Name="OnlyUpdatesCheck" DockPanel.Dock="Top" Content="N'afficher que les pilotes à mettre à jour / manquants"

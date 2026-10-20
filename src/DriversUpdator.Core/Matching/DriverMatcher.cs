@@ -39,6 +39,8 @@ public sealed class DriverMatcher
         foreach (var c in all)
         {
             var i = ids.FindIndex(x => x.Equals(c.MatchedId, StringComparison.OrdinalIgnoreCase));
+            // Forme courte (ex. "VEN_8086&DEV_1911") : rang du premier ID qui la contient.
+            if (i < 0) i = ids.FindIndex(x => x.Contains(c.MatchedId, StringComparison.OrdinalIgnoreCase));
             c.MatchRank = i < 0 ? int.MaxValue : i;
         }
 

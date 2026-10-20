@@ -29,12 +29,31 @@ public sealed partial class UpdateCatalogSource : IDriverSource
     {
         // On interroge du plus précis au plus générique et on s'arrête au premier résultat.
         // Les IDs compatibles (classes génériques) donneraient trop de bruit.
-        foreach (var id in device.HardwareIds.Take(3))
+        foreach (var id in CatalogQueries(device))
         {
             var results = await SearchAsync(id, ct);
             if (results.Count > 0) return results;
         }
         return Array.Empty<DriverCandidate>();
+    }
+
+    /// <summary>
+    /// Requêtes à essayer : les 2 IDs les plus précis, puis la forme courte "VEN_xxxx&amp;DEV_yyyy"
+    /// (ou "VID_&amp;PID_" en USB), sous laquelle le catalogue référence la plupart des pilotes.
+    /// </summary>
+    private static IEnumerable<string> CatalogQueries(DeviceInfo device)
+    {
+        var queries = device.HardwareIds.Take(2).ToList();
+        foreach (var id in device.AllIds)
+        {
+            var ven = HardwareId.Vendor(id);
+            var dev = HardwareId.Device(id);
+            if (ven is null || dev is null) continue;
+            var usb = id.Contains("VID_", StringComparison.OrdinalIgnoreCase);
+            queries.Add(usb ? $"VID_{ven}&PID_{dev}" : $"VEN_{ven}&DEV_{dev}");
+            break;
+        }
+        return queries.Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IReadOnlyList<DriverCandidate>> SearchAsync(string hardwareId, CancellationToken ct = default)
