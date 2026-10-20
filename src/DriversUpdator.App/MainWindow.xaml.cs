@@ -33,7 +33,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _log = new Progress<string>(msg => { LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}\n"); LogBox.ScrollToEnd(); });
-        _catalog = new UpdateCatalogSource(_http);
+        _catalog = new UpdateCatalogSource(_http) { Log = _log };
         _installer = new DriverInstaller(CacheDir, _http, _catalog);
         _sdio = new SdioPackSource(Path.Combine(AppDir, "packs"), CacheDir);
 

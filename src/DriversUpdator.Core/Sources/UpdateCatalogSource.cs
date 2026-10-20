@@ -16,6 +16,9 @@ public sealed partial class UpdateCatalogSource : IDriverSource
 
     public string Name => "Update Catalog";
 
+    /// <summary>Journal optionnel : pilotes écartés car d'une autre classe que le périphérique.</summary>
+    public IProgress<string>? Log { get; set; }
+
     public UpdateCatalogSource(HttpClient? http = null)
     {
         _http = http ?? new HttpClient();
@@ -31,7 +34,10 @@ public sealed partial class UpdateCatalogSource : IDriverSource
         // Les IDs compatibles (classes génériques) donneraient trop de bruit.
         foreach (var id in CatalogQueries(device))
         {
-            var results = (await SearchAsync(id, ct)).Where(c => ClassMatches(c, device)).ToList();
+            var all = await SearchAsync(id, ct);
+            var results = all.Where(c => ClassMatches(c, device)).ToList();
+            foreach (var rejected in all.Except(results).Take(3))
+                Log?.Report($"Écarté pour {device.Name} (classe {device.ClassName}) : {rejected.Description}");
             if (results.Count > 0) return results;
         }
         return Array.Empty<DriverCandidate>();
