@@ -80,7 +80,7 @@ public partial class MainWindow : Window
         if (sources.Count == 0) { _log.Report("Aucune source : activez la recherche en ligne ou indexez des packs SDIO."); return; }
         var matcher = new DriverMatcher(sources, _log);
 
-        using var gate = new SemaphoreSlim(4); // limite les requêtes simultanées
+        using var gate = new SemaphoreSlim(8); // limite les requêtes simultanées
         int done = 0;
         await Task.WhenAll(toCheck.Select(async row =>
         {

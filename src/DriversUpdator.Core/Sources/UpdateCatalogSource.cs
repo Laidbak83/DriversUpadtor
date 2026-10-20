@@ -30,13 +30,15 @@ public sealed partial class UpdateCatalogSource : IDriverSource
 
     public async Task<IReadOnlyList<DriverCandidate>> FindAsync(DeviceInfo device, CancellationToken ct = default)
     {
-        // On interroge du plus précis au plus générique et on s'arrête au premier résultat.
-        // Les IDs compatibles (classes génériques) donneraient trop de bruit.
-        foreach (var id in CatalogQueries(device))
+        // Les IDs compatibles (classes génériques) donneraient trop de bruit : ils ne sont pas interrogés.
+        // Toutes les requêtes du périphérique partent en même temps ; on garde ensuite
+        // la première (la plus précise) qui donne un résultat valable.
+        var queries = CatalogQueries(device).ToList();
+        var responses = await Task.WhenAll(queries.Select(q => SearchCachedAsync(q, ct)));
+        for (int i = 0; i < queries.Count; i++)
         {
-            var all = await SearchAsync(id, ct);
-            var results = all.Where(c => ClassMatches(c, device)).ToList();
-            foreach (var rejected in all.Except(results).Take(3))
+            var results = responses[i].Where(c => ClassMatches(c, device)).ToList();
+            foreach (var rejected in responses[i].Except(results).Take(3))
                 Log?.Report($"Écarté pour {device.Name} (classe {device.ClassName}) : {rejected.Description}");
             if (results.Count > 0) return results;
         }
@@ -73,6 +75,13 @@ public sealed partial class UpdateCatalogSource : IDriverSource
         }
         return queries.Distinct(StringComparer.OrdinalIgnoreCase);
     }
+
+    // Plusieurs périphériques partagent souvent le même VEN/DEV (ports USB, HID...) : une seule requête par terme.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task<IReadOnlyList<DriverCandidate>>> _cache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private Task<IReadOnlyList<DriverCandidate>> SearchCachedAsync(string query, CancellationToken ct)
+        => _cache.GetOrAdd(query, q => SearchAsync(q, ct));
 
     public async Task<IReadOnlyList<DriverCandidate>> SearchAsync(string hardwareId, CancellationToken ct = default)
     {

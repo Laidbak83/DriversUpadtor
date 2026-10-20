@@ -20,7 +20,4 @@ public sealed class DriverCandidate
     /// Null = l'installeur est lancé normalement et l'utilisateur suit l'assistant.
     /// </summary>
     public string? InstallerArguments { get; init; }
-
-    /// <summary>Rang de correspondance : plus petit = plus précis (index dans la liste des IDs).</summary>
-    public int MatchRank { get; set; }
 }

@@ -49,18 +49,20 @@ public sealed class DriverMatcher
             }
         }
 
+        // Les candidats peuvent être partagés entre périphériques (cache des sources) :
+        // le rang est calculé localement, sans modifier les objets.
         var ids = device.AllIds.ToList();
-        foreach (var c in all)
+        int Rank(DriverCandidate c)
         {
             var i = ids.FindIndex(x => x.Equals(c.MatchedId, StringComparison.OrdinalIgnoreCase));
             // Forme courte (ex. "VEN_8086&DEV_1911") : rang du premier ID qui la contient.
             if (i < 0) i = ids.FindIndex(x => x.Contains(c.MatchedId, StringComparison.OrdinalIgnoreCase));
-            c.MatchRank = i < 0 ? int.MaxValue : i;
+            return i < 0 ? int.MaxValue : i;
         }
 
         // Comme Windows : d'abord l'ID le plus précis, puis le pilote le plus récent.
         var best = all
-            .OrderBy(c => c.MatchRank)
+            .OrderBy(Rank)
             .ThenByDescending(c => c.Date ?? DateTime.MinValue)
             .ThenByDescending(c => c.Version)
             .FirstOrDefault();
