@@ -1,0 +1,32 @@
+<Window x:Class="DriversUpdator.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DriversUpdator" Height="650" Width="1150" WindowStartupLocation="CenterScreen">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="ScanButton" Content="1. Scanner le matériel" Padding="10,4" Margin="0,0,6,0" Click="Scan_Click"/>
+            <Button x:Name="IndexButton" Content="Indexer les packs SDIO..." Padding="10,4" Margin="0,0,6,0" Click="Index_Click"/>
+            <CheckBox x:Name="OnlineCheck" Content="Chercher aussi sur Update Catalog" IsChecked="True" VerticalAlignment="Center" Margin="6,0"/>
+            <Button x:Name="CheckButton" Content="2. Rechercher les mises à jour" Padding="10,4" Margin="0,0,6,0" Click="Check_Click"/>
+            <Button x:Name="InstallButton" Content="3. Installer la sélection" Padding="10,4" Margin="0,0,6,0" Click="Install_Click"/>
+            <Button Content="Sauvegarder mes pilotes..." Padding="10,4" Margin="0,0,6,0" Click="Backup_Click"/>
+            <Button Content="Chercher sur Touslesdrivers" Padding="10,4" Click="Web_Click"/>
+        </StackPanel>
+        <TextBox x:Name="LogBox" DockPanel.Dock="Bottom" Height="110" IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" Margin="0,8,0,0"/>
+        <CheckBox x:Name="OnlyUpdatesCheck" DockPanel.Dock="Top" Content="N'afficher que les pilotes à mettre à jour / manquants"
+                  Margin="0,0,0,6" Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+        <DataGrid x:Name="DriverGrid" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="30"/>
+                <DataGridTextColumn Header="Périphérique" Binding="{Binding Name}" Width="2*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Classe" Binding="{Binding ClassName}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Installé" Binding="{Binding Installed}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Disponible" Binding="{Binding Available}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="90" IsReadOnly="True"/>
+                <DataGridTextColumn Header="État" Binding="{Binding Status}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="ID matériel" Binding="{Binding HardwareId}" Width="2*" IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>
